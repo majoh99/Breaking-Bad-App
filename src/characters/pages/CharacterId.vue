@@ -1,40 +1,26 @@
 <script setup lang="ts">
-import { useRoute } from 'vue-router';
-import { useQuery } from '@tanstack/vue-query';
+import { watchEffect } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import useCharacter from '../composables/useCharacter';
 
-import rickAndMortyApi from '@/api/rickAndMortyApi';
-import characterStore from '@/store/characters.store';
-import type { Result } from '@/characters/interfaces/character';
-
-
+const router = useRouter();
 const route = useRoute();
 
 const { id } = route.params as { id: string };
+const { character, hasError, errorMessage, isLoading } = useCharacter( id );
 
-const getCharacterFirst = async( characterId: string ):Promise<Result> => {
-  if ( characterStore.checkIdInStore(characterId) ){
-    return characterStore.ids.list[characterId];
+watchEffect( () => {
+  if ( !isLoading.value && hasError.value){
+    router.replace('/characters');
   }
-  const { data } = await rickAndMortyApi.get<Result>(`/character/${characterId}`);
-  return data;
-}
-
-const { data: character } = useQuery(
-  ['character', id],
-  () => getCharacterFirst(id),
-  {
-    onSuccess( character ){
-      console.log('onSuccess');
-      characterStore.loadedCharacter(character as Result);
-    }
-  }
-)
+})
 
 </script>
 
 <template>
-  <h2 v-if="!character">Loading...</h2>
-  <div v-else>
+  <h2 v-if="isLoading">Loading...</h2>
+  <h2 v-else-if="hasError">{{ errorMessage }}</h2>
+  <div v-else-if="character">
     <h1>{{ character.name }}</h1>
     <div class="character-container">
       <img :src="character.image" :alt="character.name">

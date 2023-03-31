@@ -1,52 +1,54 @@
-import { ref, onMounted } from 'vue';
-import axios from 'axios';
-import rickAndMortyApi from '@/api/rickAndMortyApi';
+import { computed, ref } from 'vue';
+import { useQuery } from '@tanstack/vue-query';
+
 import type { Character, Result } from '@/characters/interfaces/character';
+import rickAndMortyApi from '@/api/rickAndMortyApi';
 
-const characters = ref<Result[]>([]);
-const isLoading = ref<boolean>(true);
-const isError = ref<boolean>(false);
-const errorMessage = ref<string>('');
 
-export const useCharacters = () => {
+const characters   = ref<Result[]>([]);
+const hasError     = ref<boolean>(false);
+const errorMessage = ref<string | null>(null);
 
-	onMounted( async() => {
-		loadCharacters();
-	});
+const getCharacters = async() => {
+  
+    if ( characters.value.length > 0) {
+        return characters.value;
+    }
 
-	const loadCharacters = async() => {
-		
-		if (characters.value.length > 0) return;
+    const { data } = await rickAndMortyApi.get<Character>('/character');
+    
+    return data.results;
+};
 
-		isLoading.value = true;
-
-		try {
-			const { data } = await rickAndMortyApi.get<Character>('/character');
-			characters.value = data.results;
-			isLoading.value = false;
-
-		} catch (error) {
-			isError.value = true;
-			isLoading.value = false;
-			if ( axios.isAxiosError(error) ) {
-				return errorMessage.value = error.message;
-			}
-			errorMessage.value = JSON.stringify(error);
-		}
-
-		
-
-		// rickAndMortyApi.get<Character>('/character')
-		// 	.then( resp => {
-		// 		characters.value = resp.data.results;
-		// 		isLoading.value = false;
-		// 	});
-	}
-
-	return {
-		characters,
-		isLoading,
-		isError,
-		errorMessage,
-	}
+const loadedCharacters = ( data: Result[] ) => {
+    hasError.value     = false;
+    errorMessage.value = null;
+    characters.value   = data;
+    
 }
+
+const useCharacters = () => {
+    
+    const { isLoading } = useQuery(
+        ['characters'],
+        getCharacters,
+        {
+            onSuccess: loadedCharacters,
+        }
+      );
+
+    return {
+        // Properties
+        characters,
+        errorMessage,
+        hasError,
+        isLoading,
+
+        // Getters
+        count: computed( () => characters.value.length ),
+
+        // Methods
+    }
+}
+
+export default useCharacters;
